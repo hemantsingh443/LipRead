@@ -1,57 +1,87 @@
-# Import all of the dependencies
 import streamlit as st
-import os 
-import imageio 
+import os
+import imageio
+import numpy as np
+import tensorflow as tf
 
-import tensorflow as tf 
 from utils import load_data, num_to_char
-from modelutil import load_model
+from modelutil import create_lipnet_model
 
-# Set the layout to the streamlit app as wide 
+# Set Streamlit layout
 st.set_page_config(layout='wide')
 
-# Setup the sidebar
-with st.sidebar: 
+# Sidebar
+with st.sidebar:
     st.image('https://www.onepointltd.com/wp-content/uploads/2020/03/inno2.png')
     st.title('LipBuddy')
-    st.info('This application is originally developed from the LipNet deep learning model.')
+    st.info('This application is based on the LipNet deep learning model.')
 
-st.title('LipNet Full Stack App') 
-# Generating a list of options or videos 
-options = os.listdir(os.path.join('..', 'data', 's1'))
-selected_video = st.selectbox('Choose video', options)
+st.title('LipNet Full Stack App')
 
-# Generate two columns 
+# Ensure the video dataset directory exists
+video_dir = os.path.join("..", "data", "s1")
+if not os.path.exists(video_dir):
+    st.error(f"⚠️ Video dataset directory not found: {video_dir}")
+    st.stop()
+
+# List available videos
+options = os.listdir(video_dir)
+selected_video = st.selectbox('Choose video', options) if options else None
+
+# Display columns
 col1, col2 = st.columns(2)
 
-if options: 
+if selected_video:
+    file_path = os.path.join(video_dir, selected_video)
 
-    # Rendering the video 
-    with col1: 
-        st.info('The video below displays the converted video in mp4 format')
-        file_path = os.path.join('..','data','s1', selected_video)
-        os.system(f'ffmpeg -i {file_path} -vcodec libx264 test_video.mp4 -y')
+    with col1:
+        st.info('🎥 The video below displays the converted video in MP4 format')
 
-        # Rendering inside of the app
-        video = open('test_video.mp4', 'rb') 
-        video_bytes = video.read() 
-        st.video(video_bytes)
+        # Convert to mp4 format if needed
+        converted_video_path = "test_video.mp4"
+        os.system(f'ffmpeg -i "{file_path}" -vcodec libx264 "{converted_video_path}" -y')
 
+        # Show video in Streamlit
+        with open(converted_video_path, 'rb') as video_file:
+            video_bytes = video_file.read()
+            st.video(video_bytes)
 
-    with col2: 
-        st.info('This is all the machine learning model sees when making a prediction')
-        video, annotations = load_data(tf.convert_to_tensor(file_path))
-        imageio.mimsave('animation.gif', video, fps=10)
-        st.image('animation.gif', width=400) 
+    with col2:
+        st.info("🧠 This is all the model sees when making a prediction")
 
-        st.info('This is the output of the machine learning model as tokens')
-        model = load_model()
-        yhat = model.predict(tf.expand_dims(video, axis=0))
-        decoder = tf.keras.backend.ctc_decode(yhat, [75], greedy=True)[0][0].numpy()
-        st.text(decoder)
+        try:
+            # Load and preprocess video
+            video_frames, annotations = load_data(tf.convert_to_tensor(file_path))
+
+            # Debugging info
+            st.text(f"📏 Video Frames Shape: {video_frames.shape}")
+            st.text(f"📝 Annotations Type: {type(annotations)}")
+
+            # Convert frames to GIF format for visualization
+            processed_frames = [(frame.numpy() * 255).astype(np.uint8).squeeze() for frame in video_frames]
+            gif_path = "animation.gif"
+            imageio.mimsave(gif_path, processed_frames, fps=10)
+            st.image(gif_path, width=400)
+
+        except Exception as e:
+            st.error(f"⚠️ Error loading video data: {e}")
+            st.stop()
+
+    st.info("🔍 This is the output of the machine learning model as tokens")
+
+    try:
+        # Load the model
+        model = create_lipnet_model()
+
+        # Perform prediction
+        yhat = model.predict(tf.expand_dims(video_frames, axis=0))
+        decoded = tf.keras.backend.ctc_decode(yhat, [75], greedy=True)[0][0].numpy()
 
         # Convert prediction to text
-        st.info('Decode the raw tokens into words')
-        converted_prediction = tf.strings.reduce_join(num_to_char(decoder)).numpy().decode('utf-8')
-        st.text(converted_prediction)
-        
+        predicted_text = tf.strings.reduce_join([num_to_char(x) for x in decoded]).numpy().decode('utf-8')
+
+        st.text("📝 Prediction:")
+        st.text(predicted_text)
+
+    except Exception as e:
+        st.error(f"⚠️ Error during model prediction: {e}")

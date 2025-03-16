@@ -1,7 +1,8 @@
 import os
-from tensorflow.keras.models import Sequential 
-from tensorflow.keras.layers import Input
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
 
+# Define the model architecture
 def create_lipnet_model():
     from tensorflow.keras.layers import (
         Conv3D, LSTM, Dense, Dropout, Bidirectional, MaxPool3D, Activation, 
@@ -11,8 +12,7 @@ def create_lipnet_model():
     model = Sequential()
 
     # CNN layers
-    model.add(Input(shape=(75, 46, 140, 1)))  # Define input shape separately
-    model.add(Conv3D(128, 3, padding='same', activation='relu'))
+    model.add(Conv3D(128, 3, input_shape=(75, 46, 140, 1), padding='same', activation='relu'))
     model.add(MaxPool3D((1, 2, 2)))
 
     model.add(Conv3D(256, 3, padding='same', activation='relu'))
@@ -36,22 +36,18 @@ def create_lipnet_model():
 
     return model
 
-# Load the model architecture
+# Load the model
 model = create_lipnet_model()
 
-# Path to the saved weights
-import os
+# Load TensorFlow checkpoint
+checkpoint_path = os.path.join("..", "models", "checkpoint")
+ckpt = tf.train.Checkpoint(model=model)
 
-weights_path = os.path.join("..", "models", "model_weights.weights.h5")
-absolute_path = os.path.abspath(weights_path)
+# Restore checkpoint
+ckpt.restore(tf.train.latest_checkpoint(os.path.dirname(checkpoint_path))).expect_partial()
+print("✅ Checkpoint loaded successfully.")
 
-if not os.path.exists(absolute_path):
-    raise FileNotFoundError(f"❌ Weights file not found at: {absolute_path}")
-
-try:
-    model.load_weights(absolute_path)
-    print("✅ Model weights loaded successfully.")
-except Exception as e:
-    raise RuntimeError(f"❌ Error loading model weights: {e}")
-
-
+# Save weights in the correct format
+model.save_weights("1-model_weights.weights.h5")
+print("✅ Weights saved as 'model_weights.weights.h5'.") 
+print("put the created file ////   model_weights.weights.h5   /////  in the models/")

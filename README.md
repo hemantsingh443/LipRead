@@ -7,6 +7,7 @@ models/ (structure should be)
 
 AND in checkpoint.txt file 
 
+```yaml
 model_checkpoint_path: "ckpt-1"                 
 all_model_checkpoint_paths: "ckpt-1"
 

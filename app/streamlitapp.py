@@ -3,7 +3,6 @@ import os
 import imageio
 import numpy as np
 import tensorflow as tf
-
 from utils import load_data, num_to_char
 from modelutil import create_lipnet_model
 
